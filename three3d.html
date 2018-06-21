@@ -17,14 +17,21 @@
       cursor: move;
       overflow: hidden;
     }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 100;
+    }
   </style>
 </head>
 <body onload="init()">
+  <div id="controlBtn" class="controlBtn controlIconae"></div>
 
   <script type="text/javascript" src="js/three.min.js"></script>
   <script type="text/javascript" src="js/CSS3DRenderer.js"></script>
   <script type="text/javascript">
-      var scene, camera, renderer;
+      var scene, camera, renderer, renderer1, camera1;
       var geometry, material, mesh;
       var target = new THREE.Vector3();
       var WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
@@ -98,6 +105,7 @@
 
           scene.add(object);
         }
+
       }
 
       function initListen() {

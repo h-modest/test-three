@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>three.js plane_game</title>
+  <style media="screen">
+    * {
+      padding: 0;
+      margin: 0;
+    }
+
+    #world {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(#e4e0ba, #f7d9aa);
+    }
+  </style>
+</head>
+<body>
+  <div id="world"></div>
+
+  <script type="text/javascript" src="js/three.min.js"></script>
+  <script type="text/javascript">
+    function normalize(v, vmin, vmax, tmin, tmax) {
+      var nv = Math.max(Math.min(v,vmax), vmin);
+      var dv = vmax-vmin;
+      var pc = (nv-vmin)/dv;
+      var dt = tmax-tmin;
+      var tv = tmin + (pc*dt);
+      return tv;
+    }
+  </script>
+  <script type="text/javascript">
+    (function(win, doc){
+      win.addEventListener('load', init, false);
+
+      var WIDTH = win.innerWidth, HEIGHT = win.innerHeight;
+      var scene, camera, renderer;
+      var aspectRatio = WIDTH / HEIGHT, fieldOfView = 60, nearPlane = 1, farPlane = 10000;
+      var hemisphereLight, shadowLight, container;
+      var mousePos={x:0, y:0};
+      var Colors = {
+            red: 0xf25346,
+            white: 0xd8d0d1,
+            brown: 0x59332e,
+            pink: 0xF5986E,
+            brownDark: 0x23190f,
+            blue: 0x68c3c0
+          };
+
+      // 初始化场景
+      function initScene() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xf7d9aa, 100, 950);
+      }
+
+      // 初始化相机
+      function initCamera() {
+        camera = new THREE.PerspectiveCamera(fieldOfView, aspectRatio, nearPlane, farPlane);
+        camera.position.x = 0;
+        camera.position.z = 200;
+        camera.position.y = 100;
+      }
+
+      // 初始化渲染器
+      function initRenderer() {
+        renderer = new THREE.WebGLRenderer({
+          alpha: true,
+          antialias: true,
+        });
+        renderer.setSize(WIDTH, HEIGHT);
+        renderer.shadowMap.enabled = true;
+        container = doc.getElementById('world');
+        container.appendChild(renderer.domElement);
+      }
+
+      function render() {
+        updatePlane();
+        requestAnimationFrame(render);
+        renderer.render(scene, camera);
+      }
+
+      function updatePlane() {
+        var targetX = normalize(mousePos.x, -1, 1, -100, 100);
+      	var targetY = normalize(mousePos.y, -1, 1, 25, 175);
+
+      	// update the airplane's position
+      	airplane.mesh.position.y = targetY;
+      	airplane.mesh.position.x = targetX;
+      	airplane.prop.rotation.x += 0.3;
+      }
+
+      function initListen() {
+        var onWindowResize = function(){
+          var W = win.innerWidth, H = win.innerHeight;
+          renderer.setSize(W, H);
+          camera.aspect = W/H;
+          camera.updateProjectionMatrix();
+        }
+        var dir = 0, up = 0, std = 15;
+        var onWindowPresh = function(event){
+          if (event.keyCode == 39) {
+            dir+=std;
+          }
+          if (event.keyCode == 37) {
+            dir-=std;
+          }
+          if (event.keyCode == 38) {
+            up-=std;
+          }
+          if (event.keyCode == 40) {
+            up+=std;
+          }
+          var dx = (dir / WIDTH)*2;
+          var dy = -(up / HEIGHT)*2;
+
+          mousePos = { x:dx, y:dy };
+        }
+
+        doc.addEventListener('resize', onWindowResize, false);
+        doc.addEventListener('keydown', onWindowPresh, false);
+      }
+
+      // 初始化光源
+      function initLight() {
+        hemisphereLight = new THREE.HemisphereLight(0xaaaaaa, 0x000000, .9);
+        shadowLight = new THREE.DirectionalLight(0xffffff, .9);
+
+        shadowLight.position.set(150,350,350);
+        shadowLight.castShodow = true;
+
+        shadowLight.shadow.camera.left = -400;
+        shadowLight.shadow.camera.right = 400;
+        shadowLight.shadow.camera.top = 400;
+        shadowLight.shadow.camera.bottom = -400;
+        shadowLight.shadow.camera.near = 1;
+        shadowLight.shadow.camera.far = 1000;
+
+        shadowLight.shadow.mapSize.width = 2048;
+        shadowLight.shadow.mapSize.height = 2048;
+
+        scene.add(hemisphereLight);
+        scene.add(shadowLight);
+      }
+
+      var airplane;
+
+      // 初始化飞行员
+      function createPlane() {
+        var airPlane = function() {
+
+          this.mesh = new THREE.Object3D();
+
+          var geom1 = new THREE.BoxGeometry(80,50,50,1,1,1);
+          var mat1 = new THREE.MeshPhongMaterial({ color: 0xf25346, shading: THREE.FlatShading });
+          geom1.vertices[4].y -= 10;
+          geom1.vertices[4].z += 20;
+          geom1.vertices[5].y -= 10;
+          geom1.vertices[5].z -= 20;
+          geom1.vertices[6].y += 30;
+          geom1.vertices[6].z += 20;
+          geom1.vertices[7].y += 30;
+          geom1.vertices[7].z -= 20;
+          var mesh1 = new THREE.Mesh(geom1, mat1);
+          mesh1.castShodow = true;
+          mesh1.receiveShodow = true;
+          this.mesh.add(mesh1);
+
+          var geom2 = new THREE.BoxGeometry(20,60,50,1,1,1);
+          var mat2 = new THREE.MeshPhongMaterial({ color: Colors.white, shading: THREE.FlatShading });
+          var mesh2 = new THREE.Mesh(geom2, mat2);
+          mesh2.position.x = 40;
+          mesh2.castShodow = true;
+          mesh2.receiveShodow = true;
+          this.mesh.add(mesh2);
+
+          var geom3 = new THREE.BoxGeometry(15,20,5,1,1,1);
+          var mat3 = new THREE.MeshPhongMaterial({ color: 0xf25346, shading: THREE.FlatShading });
+          geom3.vertices[0].x -= 15;
+          geom3.vertices[1].x -= 15;
+          var mesh3 = new THREE.Mesh(geom3, mat3);
+          mesh3.position.set(-33,25,0);
+          mesh3.rotation.y = 0;
+          mesh3.castShodow = true;
+          mesh3.receiveShodow = true;
+          this.mesh.add(mesh3);
+
+          var geom4 = new THREE.BoxGeometry(15,5,5,1,1,1);
+          var mat4 = new THREE.MeshPhongMaterial({ color: Colors.brown, shading: THREE.FlatShading });
+          this.prop = new THREE.Mesh(geom4, mat4);
+          this.prop.castShodow = true;
+          this.prop.receiveShodow = true;
+
+          var geom5 = new THREE.BoxGeometry(1,80,20,1,1,1);
+          var mat5 = new THREE.MeshPhongMaterial({color: Colors.brown, shading: THREE.FlatShading });
+          var mesh5 = new THREE.Mesh(geom5, mat5);
+          mesh5.castShodow = true;
+          mesh5.receiveShodow = true;
+          this.prop.add(mesh5);
+          this.prop.position.set(60,0,0);
+          this.mesh.add(this.prop);
+
+
+
+        }
+
+        airplane = new airPlane();
+        airplane.mesh.scale.set(.25,.25,.25);
+        airplane.mesh.position.y = 100;
+        scene.add(airplane.mesh);
+      }
+
+      // 渲染
+
+      function init() {
+        initScene();
+        initCamera();
+        initRenderer();
+        initLight();
+
+        createPlane();
+
+        initListen();
+        render();
+      }
+    })(window, document)
+  </script>
+</body>
+</html>
