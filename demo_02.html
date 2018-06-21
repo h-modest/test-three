@@ -99,7 +99,7 @@
           camera.updateProjectionMatrix();
         }
 
-        var hemisphereLight, shadowLight;
+        var hemisphereLight, shadowLight, anbientLight;
 
         function createLights() {
           // 渐变的阴影
@@ -126,7 +126,10 @@
           shadowLight.shadow.mapSize.width = 2048;
           shadowLight.shadow.mapSize.height = 2048;
 
+          anbientLight = new THREE.AmbientLight(0xdc8874, .5);
+
           // 光源加到场景内
+          scene.add(anbientLight);
           scene.add(hemisphereLight);
           scene.add(shadowLight);
 
@@ -136,23 +139,53 @@
         var Sea = function() {
           // 创建一个圆柱几何体
           // 参数为：顶面半径，底面半径，高度，半径分段，高度分段
-          var geom = new THREE.CylinderGeometry(600,600,800,400,10);
+          var geom = new THREE.CylinderGeometry(600,600,800,40,10);
 
           // 关于x坐标旋转
           geom.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI/2));
 
-          // 创建材质
+          // // 创建材质
+          // var mat = new THREE.MeshPhongMaterial({
+          //   color: Colors.blue,
+          //   transparent: true,
+          //   opacity: .6,
+          //   shading: THREE.FlatShading,
+          // });
+          //
+          // // 为了在 Three.js 创建一个物体，我们必须创建网格用来组合几何体和一些材质
+          // this.mesh = new THREE.Mesh(geom, mat);
+          //
+          // //允许大海接受阴影
+          // this.mesh.receiveShadow = true;
+
+          // 波浪
+          geom.mergeVertices();
+
+          var l = geom.vertices.length;
+
+          this.waves = [];
+
+          for (var i = 0; i < l; i++) {
+            var v = geom.vertices[i];
+
+            this.waves.push({
+              y: v.y,
+              x: v.x,
+              z: v.z,
+              ang: Math.random()*Math.PI*2,
+              amp: 5+ Math.random()*15,
+              speed: .016 + Math.random()*.032
+            })
+          }
+
           var mat = new THREE.MeshPhongMaterial({
             color: Colors.blue,
             transparent: true,
-            opacity: .6,
+            opacity: .8,
             shading: THREE.FlatShading,
           });
 
-          // 为了在 Three.js 创建一个物体，我们必须创建网格用来组合几何体和一些材质
           this.mesh = new THREE.Mesh(geom, mat);
-
-          //允许大海接受阴影
           this.mesh.receiveShadow = true;
         }
 
@@ -208,6 +241,26 @@
           }
         }
 
+        Sea.prototype.moveWaves = function() {
+          var verts = this.mesh.geometry.vertices;
+          var l = verts.length;
+
+          for (var i = 0; i < l; i++) {
+            var v = verts[i];
+
+            var vprops = this.waves[i];
+
+            v.x = vprops.x + Math.cos(vprops.ang) * vprops.amp;
+            v.y = vprops.y + Math.sin(vprops.ang) * vprops.amp;
+
+            vprops.ang += vprops.speed;
+          }
+
+          this.mesh.geometry.verticesNeddUpdate = true;
+
+          sea.mesh.rotation.z += .005;
+        }
+
         // 定义天空的对象
         var Sky = function() {
           // 创建空模型
@@ -257,11 +310,32 @@
           this.mesh = new THREE.Object3D();
 
           // 创建
-          var geomCockpit = new THREE.BoxGeometry(60,50,50,1,1,1);
+          // 初版
+          // var geomCockpit = new THREE.BoxGeometry(60,50,50,1,1,1);
+          // var matCockpit = new THREE.MeshPhongMaterial({
+          //   color: Colors.red,
+          //   shading: THREE.FlatShading
+          // });
+          // var cockpit = new THREE.Mesh(geomCockpit, matCockpit);
+          // cockpit.castShadow = true;
+          // cockpit.receiveShadow = true;
+          // this.mesh.add(cockpit);
+
+          var geomCockpit = new THREE.BoxGeometry(80,50,50,1,1,1);
           var matCockpit = new THREE.MeshPhongMaterial({
             color: Colors.red,
             shading: THREE.FlatShading
           });
+
+          geomCockpit.vertices[4].y-=10;
+          geomCockpit.vertices[4].z+=20;
+          geomCockpit.vertices[5].y-=10;
+          geomCockpit.vertices[5].z-=20;
+          geomCockpit.vertices[6].y+=30;
+          geomCockpit.vertices[6].z+=20;
+          geomCockpit.vertices[7].y+=30;
+          geomCockpit.vertices[7].z-=20;
+
           var cockpit = new THREE.Mesh(geomCockpit, matCockpit);
           cockpit.castShadow = true;
           cockpit.receiveShadow = true;
@@ -326,6 +400,11 @@
           this.propeller.add(blade);
           this.propeller.position.set(50,0,0);
           this.mesh.add(this.propeller);
+
+          // 申明对象
+          this.pilot = new Pilot();
+          this.pilot.mesh.position.set(-10,27,0);
+          this.mesh.add(this.pilot.mesh);
         }
 
         var airplane;
@@ -335,20 +414,6 @@
           airplane.mesh.scale.set(.25,.25,.25);
           airplane.mesh.position.y = 100;
           scene.add(airplane.mesh);
-        }
-
-        function loop() {
-          airplane.propeller.rotation.x += 0.6;
-          sea.mesh.rotation.z += .01;
-          sky.mesh.rotation.z += .005;
-
-          // 更新飞机动画
-          updatePlane();
-
-          renderer.render(scene, camera);
-
-          // 动画再次播放;
-          requestAnimationFrame(loop)
         }
 
         var mousePos = { x: 0, y: 0};
@@ -361,12 +426,15 @@
         }
 
         function updatePlane() {
-          var targetX = normalize(mousePos.x, -1,1,-150,150);
-          var targetY = normalize(mousePos.y, -1,1,25,175);
+          var targetX = normalize(mousePos.x, -.75,.75,-100,100);
+          var targetY = normalize(mousePos.y, -.75,.75,25,175);
 
+          airplane.mesh.position.y += (targetY - airplane.mesh.position.y)*.1;
           // 更新飞机位置
-          airplane.mesh.position.y = targetY;
-          airplane.mesh.position.x = targetX;
+          // airplane.mesh.position.y = targetY;
+          // airplane.mesh.position.x = targetX;
+          airplane.mesh.position.x = (airplane.mesh.position.y - targetY)*.0064;
+          airplane.mesh.position.z = (targetY - airplane.mesh.position.y)*.0128;
           airplane.propeller.rotation.x += 0.3;
         }
 
@@ -377,6 +445,128 @@
           var dt = tmax-tmin;
           var tv = tmin + (pc*dt);
           return tv;
+        }
+
+        var Pilot = function() {
+          this.mesh = new THREE.Object3D();
+          this.mesh.name = "pilot";
+
+          this.angleHairs = 0;
+
+          // 飞行员身体
+          var bodyGeom = new THREE.BoxGeometry(15,15,15);
+          var bodyMat = new THREE.MeshPhongMaterial({
+            color: Colors.brown,
+            shading: THREE.FlatShading
+          });
+          var body = new THREE.Mesh(bodyGeom, bodyMat);
+          body.position.set(2,-12,0);
+          this.mesh.add(body);
+
+          // 飞行员面部
+          var faceGeom = new THREE.BoxGeometry(10,10,10);
+          var faceMat = new THREE.MeshPhongMaterial({
+            color: Colors.pink
+          });
+          var face = new THREE.Mesh(faceGeom, faceMat);
+          this.mesh.add(face);
+
+          // 尾翼元素
+          var hairGeom = new THREE.BoxGeometry(4,4,4);
+          var hairMat = new THREE.MeshLambertMaterial({
+            color: Colors.brown
+          });
+          var hair = new THREE.Mesh(hairGeom, hairMat);
+
+          hair.geometry.applyMatrix(new THREE.Matrix4().makeTranslation(0,2,0));
+
+          // 创建尾翼模型
+          var hairs = new THREE.Object3D();
+
+          this.hairsTop = new THREE.Object3D();
+
+          for(var i = 0; i < 12; i++) {
+            var h = hair.clone();
+            var col = i%3;
+            var row = Math.floor(i/3);
+            var startPosZ = -4;
+            var startPosX = -4;
+            h.position.set(startPosX + row*4, 0, startPosZ + row*4);
+            this.hairsTop.add(h);
+          }
+          hairs.add(this.hairsTop);
+
+          // 创建尾翼的面部
+          var hairSideGeom = new THREE.BoxGeometry(12,4,2);
+          hairSideGeom.applyMatrix(new THREE.Matrix4().makeTranslation(-6,0,0));
+          var hairSideR = new THREE.Mesh(hairGeom, hairMat);
+          var hairSideL = new THREE.Mesh(hairSideGeom, hairMat);
+          hairSideR.position.set(8,-2,6);
+          hairs.add(hairSideR);
+          hairs.add(hairSideL);
+
+          var hairBackGeom = new THREE.BoxGeometry(2,8,10);
+          var hairBack = new THREE.Mesh(hairBackGeom, hairMat);
+          hairBack.position.set(-1,-4,0);
+          hairs.add(hairBack);
+          hairs.position.set(-5,5,0);
+
+          this.mesh.add(hairs);
+
+          var glassGeom = new THREE.BoxGeometry(5,5,5);
+          var glassMat = new THREE.MeshLambertMaterial({
+            color: Colors.brown
+          });
+          var glassR = new THREE.Mesh(glassGeom, glassMat);
+          glassR.position.set(6,0,3);
+          var glassL = glassR.clone();
+          glassL.position.z = -glassR.position.z;
+
+          var glassAGeom = new THREE.BoxGeometry(11,1,11);
+          var glassA = new THREE.Mesh(glassAGeom, glassMat);
+          this.mesh.add(glassR);
+          this.mesh.add(glassL);
+          this.mesh.add(glassA);
+
+          var earGeom = new THREE.BoxGeometry(2,3,2);
+          var earL = new THREE.Mesh(earGeom, faceMat);
+          earL.position.set(0,0,-6);
+          var earR = earL.clone();
+          earR.position.set(0,0,6);
+          this.mesh.add(earL);
+          this.mesh.add(earR);
+        }
+
+        //移动尾翼
+        Pilot.prototype.updateHairs = function() {
+          var hairs  =this.hairsTop.children;
+
+          // 更新角度
+          var l = hairs.length;
+          for (var i = 0; i < l; i++) {
+            var h = hairs[i];
+            h.scale.y = .75 + Math.cos(this.angleHairs/3)*.25;
+
+            this.angleHairs +=.16;
+          }
+        }
+
+        function loop() {
+          airplane.propeller.rotation.x += 0.6;
+          sea.mesh.rotation.z += .01;
+          sky.mesh.rotation.z += .005;
+
+          // 更新飞机动画
+          updatePlane();
+
+          airplane.pilot.updateHairs();
+
+          sea.moveWaves();
+
+          renderer.render(scene, camera);
+
+          // 动画再次播放;
+          requestAnimationFrame(loop)
         }
 
         win.addEventListener('load', init, false);

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>three3d</title>
+  <style media="screen">
+    * {
+      padding: 0;
+      margin: 0;
+    }
+
+    body {
+      background-color: #000000;
+      margin: 0;
+      cursor: move;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body onload="init()">
+
+  <script type="text/javascript" src="js/three.min.js"></script>
+  <script type="text/javascript" src="js/CSS3DRenderer.js"></script>
+  <script type="text/javascript">
+      var scene, camera, renderer;
+      var geometry, material, mesh;
+      var target = new THREE.Vector3();
+      var WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
+
+      // 出事鼠标位置
+      var lon = 90, lat = 0;
+      var phi = 0, theta = 0;
+
+      // 是否自动
+      var isAuto = true;
+      // 3D全景图片资源
+      var imgSlides = [
+        {
+          url: 'images/posx.jpg',
+          position: [ -512, 0, 0],
+          rotation: [0, Math.PI/2, 0]
+        },
+        {
+          url: 'images/negx.jpg',
+          position: [ 512, 0, 0],
+          rotation: [0, -Math.PI/2, 0]
+        },
+        {
+          url: 'images/posy.jpg',
+          position: [ 0, 512, 0],
+          rotation: [Math.PI/2, 0, Math.PI]
+        },
+        {
+          url: 'images/negy.jpg',
+          position: [ 0, -512, 0],
+          rotation: [-Math.PI/2, 0, Math.PI]
+        },
+        {
+          url: 'images/posz.jpg',
+          position: [ 0, 0, 512],
+          rotation: [0, Math.PI, 0]
+        },
+        {
+          url: 'images/negz.jpg',
+          position: [ 0, 0, -512],
+          rotation: [0, 0, 0]
+        }
+      ];
+
+      function initScene() {
+        scene = new THREE.Scene();
+      }
+
+      function initCamera() {
+        camera = new THREE.PerspectiveCamera(75, WIDTH/HEIGHT, 1, 1000);
+      }
+
+      function initRenderer() {
+        renderer = new THREE.CSS3DRenderer();
+        renderer.setSize(WIDTH, HEIGHT);
+        document.body.appendChild(renderer.domElement);
+      }
+
+      function initObject() {
+        for (var i = 0;i < imgSlides.length; i++) {
+          var side = imgSlides[i];
+
+          var element = document.createElement( 'img' );
+          element.width = 1026;
+          element.src = side.url;
+
+          // 申明对象
+          var object = new THREE.CSS3DObject( element );
+          object.position.fromArray(side.position);
+          object.rotation.fromArray(side.rotation);
+
+          scene.add(object);
+        }
+      }
+
+      function initListen() {
+        document.addEventListener('mousedown', onDocumentMouseDown, false);
+
+        //鼠标滚轮事件
+        document.addEventListener('wheel', onDocumentMouseWheel, false);
+        document.addEventListener('touchstart', onDocumentTouchStart, false);
+        document.addEventListener('touchmove', onDocumentTouchMove, false);
+        window.addEventListener('resize', onWindowResize, false);
+      }
+
+      // 屏幕尺寸自适应
+      function onWindowResize() {
+        var W = window.innerWidth, H = window.innerHeight;
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(W, H);
+      }
+
+      // 鼠标点击事件
+      function onDocumentMouseDown(event) {
+        event.preventDefault();
+
+        document.addEventListener('mousemove', onDocumentMouseMove, false);
+        document.addEventListener('mouseup', onDocumentMouseUp, false);
+      }
+
+      function onDocumentMouseMove(event) {
+        if (!isAuto) requestAnimationFrame(loop);
+
+        var movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+        var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+        lon -= movementX * .1;
+        lat += movementY * .1;
+      }
+
+      function onDocumentMouseUp(event) {
+        document.removeEventListener('mousemove', onDocumentMouseMove);
+        document.removeEventListener('mouseup', onDocumentMouseUp);
+      }
+
+      // 鼠标放大缩小事件
+      function onDocumentMouseWheel(event) {
+        if (!isAuto) requestAnimationFrame(loop);
+
+        var fov = camera.fov + event.deltaY * 0.05;
+        camera.fov = THREE.Math.clamp(fov, 10, 75);
+        camera.updateProjectionMatrix();
+      }
+
+      // 判断是否禁用默认选项
+      function isTouchDefault(event) {
+        if (event.cancelable) {
+          // 判断默认行为是否已经被禁用
+          if (!event.defaultPrevented) {
+              return true;
+          }
+        }
+        return false;
+      }
+
+      // 移动端触碰事件
+      function onDocumentTouchStart(event) {
+        if (isTouchDefault(event)) event.preventDefault();
+        if (!isAuto) requestAnimationFrame(loop);
+
+        var touch = event.touches[0];
+
+        touchX = touch.screenX;
+        touchY = touch.screenY;
+      }
+
+      function onDocumentTouchMove(event) {
+        if (isTouchDefault(event)) event.preventDefault();
+        if (!isAuto) requestAnimationFrame(loop);
+
+        var touch = event.touches[0];
+
+        lon -= (touch.screenX - touchX) * 0.1;
+        lat += (touch.screenY - touchY) * 0.1;
+        touchX = touch.screenX;
+				touchY = touch.screenY;
+      }
+
+      function render() {
+        if (isAuto) requestAnimationFrame(render);
+        loop();
+      }
+
+      // 动画轮询
+      function loop() {
+
+        lon += 0.1;
+        lat = Math.max( -85, Math.min(85, lat));
+        phi = THREE.Math.degToRad( 90 - lat);
+        theta = THREE.Math.degToRad(lon);
+
+        target.x = Math.sin(phi) * Math.cos(theta);
+        target.y = Math.cos(phi);
+        target.z = Math.sin(phi) + Math.sin(theta);
+
+        camera.lookAt(target);
+        renderer.render(scene, camera);
+      }
+
+      function init() {
+        initCamera();
+        initScene();
+        initObject();
+        initRenderer();
+
+        //各个监听事件
+        initListen();
+
+        //渲染
+        render();
+      }
+  </script>
+</body>
+</html>
